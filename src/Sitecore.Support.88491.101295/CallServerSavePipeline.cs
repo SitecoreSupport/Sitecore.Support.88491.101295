@@ -1,16 +1,14 @@
 ﻿using Sitecore.Caching;
 using Sitecore.Data;
-using Sitecore.ExperienceEditor.Speak.Server.Contexts;
-using Sitecore.ExperienceEditor.Speak.Server.Requests;
 using Sitecore.ExperienceEditor.Speak.Server.Responses;
 using Sitecore.ExperienceEditor.Switchers;
 using Sitecore.Globalization;
 using Sitecore.Pipelines;
 using Sitecore.Pipelines.Save;
 
-namespace Sitecore.ExperienceEditor.Speak.Ribbon.Requests.SaveItem
+namespace Sitecore.Support.ExperienceEditor.Speak.Ribbon.Requests.SaveItem
 {
-  public class CallServerSavePipeline : PipelineProcessorRequest<PageContext>
+  public class CallServerSavePipeline : Sitecore.Support.ExperienceEditor.Speak.Server.Requests.PipelineProcessorRequest<Sitecore.Support.ExperienceEditor.Speak.Server.Contexts.PageContext>
   {
     public override PipelineProcessorResponseValue ProcessRequest()
     {

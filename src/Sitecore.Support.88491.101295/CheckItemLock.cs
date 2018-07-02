@@ -1,12 +1,11 @@
 ﻿using Sitecore.Data.Items;
 using Sitecore.ExperienceEditor.Speak.Server.Contexts;
-using Sitecore.ExperienceEditor.Speak.Server.Requests;
 using Sitecore.ExperienceEditor.Speak.Server.Responses;
 using Sitecore.Globalization;
 
-namespace Sitecore.ExperienceEditor.Speak.Ribbon.Requests.SaveItem
+namespace Sitecore.Support.ExperienceEditor.Speak.Ribbon.Requests.SaveItem
 {
-  public class CheckItemLock : PipelineProcessorRequest<PageContext>
+  public class CheckItemLock : Sitecore.Support.ExperienceEditor.Speak.Server.Requests.PipelineProcessorRequest<PageContext>
   {
     public override PipelineProcessorResponseValue ProcessRequest()
     {

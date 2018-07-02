@@ -1,12 +1,9 @@
-﻿using Sitecore;
-using Sitecore.Collections;
-using Sitecore.Configuration;
+﻿using Sitecore.Collections;
 using Sitecore.Data;
 using Sitecore.Data.Fields;
 using Sitecore.Data.Items;
 using Sitecore.Data.Validators;
 using Sitecore.Diagnostics;
-using Sitecore.ExperienceEditor;
 using Sitecore.ExperienceEditor.Exceptions;
 using Sitecore.ExperienceEditor.Utils;
 using Sitecore.Globalization;
@@ -30,7 +27,7 @@ using System.Web;
 using System.Web.UI;
 using System.Xml;
 
-namespace Sitecore.ExperienceEditor.Utils
+namespace Sitecore.Support.ExperienceEditor.Utils
 {
   public static class WebUtility
   {
@@ -43,29 +40,20 @@ namespace Sitecore.ExperienceEditor.Utils
     public static SiteInfo GetCurrentSiteInfo()
     {
       Assert.IsNotNull(Context.Request, "request");
-      string name = string.IsNullOrEmpty(Context.Request.QueryString["sc_pagesite"]) ? Sitecore.Configuration.Settings.Preview.DefaultSite : Context.Request.QueryString["sc_pagesite"];
-      return SiteContextFactory.GetSiteInfo(name);
+      return SiteContextFactory.GetSiteInfo(string.IsNullOrEmpty(Context.Request.QueryString["sc_pagesite"])
+        ? Sitecore.Configuration.Settings.Preview.DefaultSite
+        : Context.Request.QueryString["sc_pagesite"]);
     }
 
     public static bool IsLayoutPresetApplied()
     {
-      if (IsSublayoutInsertingMode)
+      if (!IsSublayoutInsertingMode && !string.IsNullOrEmpty(Context.PageDesigner.PageDesignerHandle) &&
+          !string.IsNullOrEmpty(WebUtil.GetSessionString(Context.PageDesigner.PageDesignerHandle)))
       {
-        return false;
+        return !string.IsNullOrEmpty(WebUtil.GetSessionString(Context.PageDesigner.PageDesignerHandle + "_SAFE"));
       }
-      if (string.IsNullOrEmpty(Context.PageDesigner.PageDesignerHandle))
-      {
-        return false;
-      }
-      if (string.IsNullOrEmpty(WebUtil.GetSessionString(Context.PageDesigner.PageDesignerHandle)))
-      {
-        return false;
-      }
-      if (string.IsNullOrEmpty(WebUtil.GetSessionString(Context.PageDesigner.PageDesignerHandle + "_SAFE")))
-      {
-        return false;
-      }
-      return true;
+
+      return false;
     }
 
     public static string GetDevice(UrlString url)
@@ -78,14 +66,15 @@ namespace Sitecore.ExperienceEditor.Utils
         url["dev"] = device.ID.ToString();
         result = device.ID.ToShortID().ToString();
       }
+
       return Assert.ResultNotNull(result);
     }
 
     public static void RenderLoadingIndicator(HtmlTextWriter output)
     {
-      System.Web.UI.Page page = new System.Web.UI.Page();
-      System.Web.UI.Control control = page.LoadControl("~/sitecore/shell/client/Sitecore/ExperienceEditor/PageEditbar/LoadingIndicator.ascx");
-      control.RenderControl(output);
+      new System.Web.UI.Page()
+        .LoadControl("~/sitecore/shell/client/Sitecore/ExperienceEditor/PageEditbar/LoadingIndicator.ascx")
+        .RenderControl(output);
     }
 
     public static void RenderLayout(Item item, HtmlTextWriter output, string siteName, string deviceId)
@@ -95,8 +84,10 @@ namespace Sitecore.ExperienceEditor.Utils
       layout = ConvertToJson(layout);
       output.Write("<input id=\"scLayout\" type=\"hidden\" value='" + layout + "' />");
       output.Write("<input id=\"scDeviceID\" type=\"hidden\" value=\"" + StringUtil.EscapeQuote(deviceId) + "\" />");
-      output.Write("<input id=\"scItemID\" type=\"hidden\" value=\"" + StringUtil.EscapeQuote(item.ID.ToShortID().ToString()) + "\" />");
-      output.Write("<input id=\"scLanguage\" type=\"hidden\" value=\"" + StringUtil.EscapeQuote(item.Language.Name) + "\" />");
+      output.Write("<input id=\"scItemID\" type=\"hidden\" value=\"" +
+                   StringUtil.EscapeQuote(item.ID.ToShortID().ToString()) + "\" />");
+      output.Write("<input id=\"scLanguage\" type=\"hidden\" value=\"" + StringUtil.EscapeQuote(item.Language.Name) +
+                   "\" />");
       output.Write("<input id=\"scSite\" type=\"hidden\" value=\"" + StringUtil.EscapeQuote(siteName) + "\" />");
     }
 
@@ -107,17 +98,18 @@ namespace Sitecore.ExperienceEditor.Utils
       XmlNodeList xmlNodeList = xmlDocument.SelectNodes("//r[@ph='']");
       if (xmlNodeList != null)
       {
-        foreach (XmlNode item2 in xmlNodeList)
+        foreach (XmlNode item in xmlNodeList)
         {
-          string value = item2.Attributes["id"].Value;
-          Item item = Context.Database.GetItem(new ID(value));
-          string value2 = item.Fields[Sitecore.ExperienceEditor.Constants.FieldNames.Placeholder].Value;
+          string value = item.Attributes["id"].Value;
+          string value2 = Context.Database.GetItem(new ID(value))
+            .Fields[Sitecore.ExperienceEditor.Constants.FieldNames.Placeholder].Value;
           if (!string.IsNullOrEmpty(value2))
           {
-            item2.Attributes["ph"].Value = value2;
+            item.Attributes["ph"].Value = value2;
           }
         }
       }
+
       layout = xmlDocument.OuterXml;
       return layout;
     }
@@ -125,22 +117,19 @@ namespace Sitecore.ExperienceEditor.Utils
     public static string ConvertToJson(string layout)
     {
       Assert.ArgumentNotNull(layout, "layout");
-      string result = WebEditUtil.ConvertXMLLayoutToJSON(layout);
-      return Assert.ResultNotNull(result);
+      return Assert.ResultNotNull(WebEditUtil.ConvertXMLLayoutToJSON(layout));
     }
 
     public static string GetLayout(Item item)
     {
       Assert.ArgumentNotNull(item, "item");
-      LayoutField layoutField = new LayoutField(item);
-      return GetLayout(layoutField);
+      return GetLayout(new LayoutField(item));
     }
 
     public static string GetLayout(Field field)
     {
       Assert.ArgumentNotNull(field, "field");
-      LayoutField layoutField = new LayoutField(field);
-      return GetLayout(layoutField);
+      return GetLayout(new LayoutField(field));
     }
 
     public static string GetLayout(LayoutField layoutField)
@@ -151,16 +140,19 @@ namespace Sitecore.ExperienceEditor.Utils
       {
         return Assert.ResultNotNull(result);
       }
+
       string pageDesignerHandle = Context.PageDesigner.PageDesignerHandle;
       if (string.IsNullOrEmpty(pageDesignerHandle))
       {
         return Assert.ResultNotNull(result);
       }
+
       string sessionString = WebUtil.GetSessionString(pageDesignerHandle);
       if (!string.IsNullOrEmpty(sessionString))
       {
         result = sessionString;
       }
+
       return Assert.ResultNotNull(result);
     }
 
@@ -168,8 +160,8 @@ namespace Sitecore.ExperienceEditor.Utils
     {
       Assert.ArgumentNotNull(form, "dictionaryForm");
       return (from string key in form.Keys
-              where !string.IsNullOrEmpty(key)
-              select key).ToDictionary((string key) => key, (string key) => form[key]);
+        where !string.IsNullOrEmpty(key)
+        select key).ToDictionary((string key) => key, (string key) => form[key]);
     }
 
     public static IEnumerable<PageEditorField> GetFields(Database database, Dictionary<string, string> dictionaryForm)
@@ -178,7 +170,8 @@ namespace Sitecore.ExperienceEditor.Utils
       List<PageEditorField> list = new List<PageEditorField>();
       foreach (string key in dictionaryForm.Keys)
       {
-        if (key.StartsWith("fld_", StringComparison.InvariantCulture) || key.StartsWith("flds_", StringComparison.InvariantCulture))
+        if (key.StartsWith("fld_", StringComparison.InvariantCulture) ||
+            key.StartsWith("flds_", StringComparison.InvariantCulture))
         {
           string text = key;
           string text2 = dictionaryForm[key];
@@ -187,6 +180,7 @@ namespace Sitecore.ExperienceEditor.Utils
           {
             text = StringUtil.Left(text, num);
           }
+
           string[] array = text.Split('_');
           ID iD = ShortID.DecodeID(array[1]);
           ID fieldID = ShortID.DecodeID(array[2]);
@@ -199,43 +193,44 @@ namespace Sitecore.ExperienceEditor.Utils
             Field field = item.Fields[fieldID];
             if (key.StartsWith("flds_", StringComparison.InvariantCulture))
             {
-              text2 = (string)WebUtil.GetSessionValue(text2);
+              text2 = (string) WebUtil.GetSessionValue(text2);
               if (string.IsNullOrEmpty(text2))
               {
                 text2 = field.Value;
               }
             }
+
             switch (field.TypeKey)
             {
-              case "html":
-              case "rich text":
-                text2 = text2.TrimEnd(' ');
+              case "multi-line text":
+              case "memo":
+                text2 = new Regex("<br.*?/*?>", RegexOptions.IgnoreCase).Replace(text2, "\r\n");
+                text2 = StringUtil.RemoveTags(text2);
                 break;
               case "text":
                 text2 = StringUtil.RemoveTags(text2);
                 break;
-              case "multi-line text":
-              case "memo":
-                {
-                  Regex regex = new Regex("<br.*/*>", RegexOptions.IgnoreCase);
-                  text2 = regex.Replace(text2, "\r\n");
-                  text2 = StringUtil.RemoveTags(text2);
-                  break;
-                }
+              case "html":
+              case "rich text":
+                text2 = text2.TrimEnd(' ');
+                break;
             }
-            PageEditorField pageEditorField = new PageEditorField();
-            pageEditorField.ControlId = text;
-            pageEditorField.FieldID = fieldID;
-            pageEditorField.ItemID = iD;
-            pageEditorField.Language = language;
-            pageEditorField.Revision = revision;
-            pageEditorField.Value = text2;
-            pageEditorField.Version = version;
-            PageEditorField item2 = pageEditorField;
+
+            PageEditorField item2 = new PageEditorField
+            {
+              ControlId = text,
+              FieldID = fieldID,
+              ItemID = iD,
+              Language = language,
+              Revision = revision,
+              Value = text2,
+              Version = version
+            };
             list.Add(item2);
           }
         }
       }
+
       return list;
     }
 
@@ -244,21 +239,24 @@ namespace Sitecore.ExperienceEditor.Utils
       List<PageEditorField> list = new List<PageEditorField>();
       foreach (Field field in item.Fields)
       {
-        PageEditorField pageEditorField = new PageEditorField();
-        pageEditorField.ControlId = null;
-        pageEditorField.FieldID = field.ID;
-        pageEditorField.ItemID = field.Item.ID;
-        pageEditorField.Language = field.Language;
-        pageEditorField.Revision = ((BaseItem)item)[FieldIDs.Revision];
-        pageEditorField.Value = field.Value;
-        pageEditorField.Version = item.Version;
-        PageEditorField item2 = pageEditorField;
+        PageEditorField item2 = new PageEditorField
+        {
+          ControlId = null,
+          FieldID = field.ID,
+          ItemID = field.Item.ID,
+          Language = field.Language,
+          Revision = ((BaseItem) item)[FieldIDs.Revision],
+          Value = field.Value,
+          Version = item.Version
+        };
         list.Add(item2);
       }
+
       return list;
     }
 
-    public static Packet CreatePacket(Database database, IEnumerable<PageEditorField> fields, out SafeDictionary<FieldDescriptor, string> controlsToValidate)
+    public static Packet CreatePacket(Database database, IEnumerable<PageEditorField> fields,
+      out SafeDictionary<FieldDescriptor, string> controlsToValidate)
     {
       Assert.ArgumentNotNull(fields, "fields");
       Packet packet = new Packet();
@@ -276,6 +274,7 @@ namespace Sitecore.ExperienceEditor.Utils
           }
         }
       }
+
       return packet;
     }
 
@@ -288,6 +287,7 @@ namespace Sitecore.ExperienceEditor.Utils
       {
         return null;
       }
+
       Field field = item.Fields[pageEditorField.FieldID];
       string text = HandleFieldValue(pageEditorField.Value, field.TypeKey);
       string fieldValidationErrorMessage = GetFieldValidationErrorMessage(field, text);
@@ -295,44 +295,53 @@ namespace Sitecore.ExperienceEditor.Utils
       {
         throw new FieldValidationException(fieldValidationErrorMessage, field);
       }
-      if (text == field.Value)
+
+      if (!(text == field.Value))
       {
-        string fieldRegexValidationError = FieldUtil.GetFieldRegexValidationError(field, text);
-        if (!string.IsNullOrEmpty(fieldRegexValidationError))
+        XmlNode xmlNode = packet.XmlDocument.SelectSingleNode("/*/field[@itemid='" + pageEditorField.ItemID +
+                                                              "' and @language='" + pageEditorField.Language +
+                                                              "' and @version='" + pageEditorField.Version +
+                                                              "' and @fieldid='" + pageEditorField.FieldID + "']");
+        if (xmlNode != null)
         {
-          if (!item.Paths.IsMasterPart && !StandardValuesManager.IsStandardValuesHolder(item))
+          Item item2 = database.GetItem(pageEditorField.ItemID, pageEditorField.Language, pageEditorField.Version);
+          if (item2 == null)
           {
-            throw new FieldValidationException(fieldRegexValidationError, field);
+            return null;
           }
-          return new FieldDescriptor(item.Uri, field.ID, text, field.ContainsStandardValue);
+
+          if (text != ((BaseItem) item2)[pageEditorField.FieldID])
+          {
+            xmlNode.ChildNodes[0].InnerText = text;
+          }
         }
+        else
+        {
+          packet.StartElement("field");
+          packet.SetAttribute("itemid", pageEditorField.ItemID.ToString());
+          packet.SetAttribute("language", pageEditorField.Language.ToString());
+          packet.SetAttribute("version", pageEditorField.Version.ToString());
+          packet.SetAttribute("fieldid", pageEditorField.FieldID.ToString());
+          packet.SetAttribute("itemrevision", pageEditorField.Revision);
+          packet.AddElement("value", text);
+          packet.EndElement();
+        }
+
+        return new FieldDescriptor(item.Uri, field.ID, text, false);
+      }
+
+      string fieldRegexValidationError = FieldUtil.GetFieldRegexValidationError(field, text);
+      if (string.IsNullOrEmpty(fieldRegexValidationError))
+      {
         return new FieldDescriptor(item.Uri, field.ID, text, field.ContainsStandardValue);
       }
-      XmlNode xmlNode = packet.XmlDocument.SelectSingleNode("/*/field[@itemid='" + pageEditorField.ItemID + "' and @language='" + pageEditorField.Language + "' and @version='" + pageEditorField.Version + "' and @fieldid='" + pageEditorField.FieldID + "']");
-      if (xmlNode != null)
+
+      if (!item.Paths.IsMasterPart && !StandardValuesManager.IsStandardValuesHolder(item))
       {
-        Item item2 = database.GetItem(pageEditorField.ItemID, pageEditorField.Language, pageEditorField.Version);
-        if (item2 == null)
-        {
-          return null;
-        }
-        if (text != ((BaseItem)item2)[pageEditorField.FieldID])
-        {
-          xmlNode.ChildNodes[0].InnerText = text;
-        }
+        throw new FieldValidationException(fieldRegexValidationError, field);
       }
-      else
-      {
-        packet.StartElement("field");
-        packet.SetAttribute("itemid", pageEditorField.ItemID.ToString());
-        packet.SetAttribute("language", pageEditorField.Language.ToString());
-        packet.SetAttribute("version", pageEditorField.Version.ToString());
-        packet.SetAttribute("fieldid", pageEditorField.FieldID.ToString());
-        packet.SetAttribute("itemrevision", pageEditorField.Revision);
-        packet.AddElement("value", text);
-        packet.EndElement();
-      }
-      return new FieldDescriptor(item.Uri, field.ID, text, false);
+
+      return new FieldDescriptor(item.Uri, field.ID, text, field.ContainsStandardValue);
     }
 
     public static string HandleFieldValue(string value, string fieldTypeKey)
@@ -354,21 +363,19 @@ namespace Sitecore.ExperienceEditor.Utils
           break;
         case "multi-line text":
         case "memo":
-          {
-            Regex regex = new Regex("<br.*/*>", RegexOptions.IgnoreCase);
-            value = regex.Replace(value, "\r\n");
-            value = StringUtil.RemoveTags(value);
-            break;
-          }
+          value = new Regex("<br.*?/*?>", RegexOptions.IgnoreCase).Replace(value, "\r\n");
+          value = StringUtil.RemoveTags(value);
+          break;
         case "word document":
           value = string.Join(Environment.NewLine, value.Split(new string[3]
           {
-                "\r\n",
-                "\n\r",
-                "\n"
+            "\r\n",
+            "\n\r",
+            "\n"
           }, StringSplitOptions.None));
           break;
       }
+
       return value;
     }
 
@@ -380,31 +387,35 @@ namespace Sitecore.ExperienceEditor.Utils
       {
         return string.Empty;
       }
+
       CultureInfo cultureInfo = LanguageUtil.GetCultureInfo();
       if (value.Length == 0)
       {
         return string.Empty;
       }
+
       switch (field.TypeKey)
       {
-        case "integer":
-          {
-            long num2;
-            if (long.TryParse(value, NumberStyles.Integer, cultureInfo, out num2))
-            {
-              return string.Empty;
-            }
-            return Translate.Text("\"{0}\" is not a valid integer.", value);
-          }
         case "number":
+        {
+          double num2;
+          if (double.TryParse(value, NumberStyles.Float, cultureInfo, out num2))
           {
-            double num;
-            if (double.TryParse(value, NumberStyles.Float, cultureInfo, out num))
-            {
-              return string.Empty;
-            }
-            return Translate.Text("\"{0}\" is not a valid number.", value);
+            return string.Empty;
           }
+
+          return Translate.Text("\"{0}\" is not a valid number.", value);
+        }
+        case "integer":
+        {
+          long num;
+          if (long.TryParse(value, NumberStyles.Integer, cultureInfo, out num))
+          {
+            return string.Empty;
+          }
+
+          return Translate.Text("\"{0}\" is not a valid integer.", value);
+        }
         default:
           return string.Empty;
       }
@@ -418,6 +429,7 @@ namespace Sitecore.ExperienceEditor.Utils
       {
         fieldId = FieldIDs.FinalLayoutField.ToString();
       }
+
       if (!string.IsNullOrEmpty(layout))
       {
         layout = WebEditUtil.ConvertJSONLayoutToXML(layout);
@@ -426,6 +438,7 @@ namespace Sitecore.ExperienceEditor.Utils
         {
           layout = XmlDeltas.GetDelta(layout, new LayoutField(item.Fields[FieldIDs.LayoutField]).Value);
         }
+
         packet.StartElement("field");
         packet.SetAttribute("itemid", item.ID.ToString());
         packet.SetAttribute("language", item.Language.ToString());
@@ -439,27 +452,29 @@ namespace Sitecore.ExperienceEditor.Utils
     public static UrlString BuildChangeLanguageUrl(UrlString url, ItemUri itemUri, string languageName)
     {
       UrlString urlString = new UrlString(url.GetUrl());
-      if (itemUri == (ItemUri)null)
+      if (itemUri == (ItemUri) null)
       {
         return null;
       }
+
       SiteContext site = SiteContext.GetSite(WebEditUtil.SiteName);
       if (site == null)
       {
         return null;
       }
+
       Item itemNotNull = Client.GetItemNotNull(itemUri);
       using (new SiteContextSwitcher(site))
       {
         using (new LanguageSwitcher(itemNotNull.Language))
         {
           urlString = BuildChangeLanguageNewUrl(languageName, url, itemNotNull);
-          LanguageEmbedding languageEmbedding = LinkManager.LanguageEmbedding;
-          if (languageEmbedding == LanguageEmbedding.Never)
+          if (LinkManager.LanguageEmbedding == LanguageEmbedding.Never)
           {
             urlString["sc_lang"] = languageName;
             return urlString;
           }
+
           urlString.Remove("sc_lang");
           return urlString;
         }
@@ -474,15 +489,19 @@ namespace Sitecore.ExperienceEditor.Utils
       {
         return text;
       }
-      SitecoreClientDeviceCapabilities sitecoreClientDeviceCapabilities = device.Capabilities as SitecoreClientDeviceCapabilities;
+
+      SitecoreClientDeviceCapabilities sitecoreClientDeviceCapabilities =
+        device.Capabilities as SitecoreClientDeviceCapabilities;
       if (sitecoreClientDeviceCapabilities == null)
       {
         return text;
       }
+
       if (sitecoreClientDeviceCapabilities.RequiresScrollbarsOnWindowOpen)
       {
         text += ",scrollbars=1,dependent=1";
       }
+
       return text;
     }
 
@@ -491,17 +510,19 @@ namespace Sitecore.ExperienceEditor.Utils
       T val = new T();
       CommandContext context = new CommandContext(new Item[1]
       {
-            contextItem
+        contextItem
       });
       return val.QueryState(context) == CommandState.Enabled;
     }
 
     public static bool IsEditAllVersionsTicked()
     {
-      if (StringUtility.EvaluateCheckboxRegistryKeyValue(Registry.GetString(Sitecore.ExperienceEditor.Constants.RegistryKeys.EditAllVersions)))
+      if (StringUtility.EvaluateCheckboxRegistryKeyValue(
+        Registry.GetString(Sitecore.ExperienceEditor.Constants.RegistryKeys.EditAllVersions)))
       {
         return IsEditAllVersionsAllowed();
       }
+
       return false;
     }
 
@@ -509,13 +530,22 @@ namespace Sitecore.ExperienceEditor.Utils
     {
       if (!isGetLayoutSourceFieldsExists.HasValue)
       {
-        isGetLayoutSourceFieldsExists = (CorePipelineFactory.GetPipeline("getLayoutSourceFields", string.Empty) != null);
+        isGetLayoutSourceFieldsExists =
+          (CorePipelineFactory.GetPipeline("getLayoutSourceFields", string.Empty) != null);
         if (!isGetLayoutSourceFieldsExists.Value)
         {
           Log.Warn("Pipeline getLayoutSourceFields is turned off.", new object());
         }
       }
-      return Context.Site != null && isGetLayoutSourceFieldsExists.Value && Sitecore.ExperienceEditor.Settings.WebEdit.ExperienceEditorEditAllVersions && Context.Site.DisplayMode != 0 && WebUtil.GetQueryString("sc_disable_edit") != "yes" && WebUtil.GetQueryString("sc_duration") != "temporary";
+
+      if (Context.Site != null && isGetLayoutSourceFieldsExists.Value &&
+          Sitecore.ExperienceEditor.Settings.WebEdit.ExperienceEditorEditAllVersions && Context.Site.DisplayMode != 0 &&
+          WebUtil.GetQueryString("sc_disable_edit") != "yes")
+      {
+        return WebUtil.GetQueryString("sc_duration") != "temporary";
+      }
+
+      return false;
     }
 
     public static ID GetCurrentLayoutFieldId()
@@ -524,6 +554,7 @@ namespace Sitecore.ExperienceEditor.Utils
       {
         return FieldIDs.FinalLayoutField;
       }
+
       return FieldIDs.LayoutField;
     }
 
@@ -533,18 +564,17 @@ namespace Sitecore.ExperienceEditor.Utils
       Assert.ArgumentNotNull(url, "url");
       Assert.ArgumentNotNull(item, "item");
       Language language;
-      bool condition = Language.TryParse(languageName, out language);
-      Assert.IsTrue(condition, $"Cannot parse the language ({languageName}).");
+      Assert.IsTrue(Language.TryParse(languageName, out language), $"Cannot parse the language ({languageName}).");
       UrlOptions defaultOptions = UrlOptions.DefaultOptions;
       defaultOptions.Language = language;
       Item item2 = item.Database.GetItem(item.ID, language);
       Assert.IsNotNull(item2, $"Item not found ({item.ID}, {language}).");
-      string itemUrl = LinkManager.GetItemUrl(item2, defaultOptions);
-      UrlString urlString = new UrlString(itemUrl);
+      UrlString urlString = new UrlString(LinkManager.GetItemUrl(item2, defaultOptions));
       foreach (string key in url.Parameters.Keys)
       {
         urlString.Parameters[key] = url.Parameters[key];
       }
+
       return urlString;
     }
   }

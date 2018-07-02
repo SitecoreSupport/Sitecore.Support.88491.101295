@@ -11,7 +11,7 @@ using Sitecore.Pipelines.Save;
 using Sitecore.Shell.Applications.WebEdit.Commands;
 using System.Collections.Generic;
 
-namespace Sitecore.ExperienceEditor.Speak.Server.Contexts
+namespace Sitecore.Support.ExperienceEditor.Speak.Server.Contexts
 {
   public class PageContext : ItemContext
   {
@@ -38,13 +38,12 @@ namespace Sitecore.ExperienceEditor.Speak.Server.Contexts
 
     public SaveArgs GetSaveArgs()
     {
-      IEnumerable<PageEditorField> fields = WebUtility.GetFields(base.Item.Database, FieldValues);
+      IEnumerable<PageEditorField> fields = Sitecore.Support.ExperienceEditor.Utils.WebUtility.GetFields(base.Item.Database, FieldValues);
       string empty = string.Empty;
       string layoutSource = LayoutSource;
-      SaveArgs saveArgs = PipelineUtil.GenerateSaveArgs(base.Item, fields, empty, layoutSource, string.Empty, WebUtility.GetCurrentLayoutFieldId().ToString());
+      SaveArgs saveArgs = PipelineUtil.GenerateSaveArgs(base.Item, fields, empty, layoutSource, string.Empty, Sitecore.Support.ExperienceEditor.Utils.WebUtility.GetCurrentLayoutFieldId().ToString());
       saveArgs.HasSheerUI = false;
-      ParseXml parseXml = new ParseXml();
-      parseXml.Process(saveArgs);
+      new ParseXml().Process(saveArgs);
       return saveArgs;
     }
 
@@ -52,16 +51,16 @@ namespace Sitecore.ExperienceEditor.Speak.Server.Contexts
     {
       Item item = base.Item;
       Assert.IsNotNull(item, "The item is null.");
-      IEnumerable<PageEditorField> fields = WebUtility.GetFields(item.Database, FieldValues);
+      IEnumerable<PageEditorField> fields = Sitecore.Support.ExperienceEditor.Utils.WebUtility.GetFields(item.Database, FieldValues);
       SafeDictionary<FieldDescriptor, string> safeDictionary = new SafeDictionary<FieldDescriptor, string>();
-      foreach (PageEditorField item3 in fields)
+      foreach (PageEditorField item2 in fields)
       {
-        Item item2 = (item.ID == item3.ItemID) ? item : item.Database.GetItem(item3.ItemID);
-        Field field = item.Fields[item3.FieldID];
-        string value = WebUtility.HandleFieldValue(item3.Value, field.TypeKey);
-        FieldDescriptor key = new FieldDescriptor(item2.Uri, field.ID, value, false);
-        string obj = item3.ControlId ?? string.Empty;
-        string text2 = safeDictionary[key] = obj;
+        Item obj = (item.ID == item2.ItemID) ? item : item.Database.GetItem(item2.ItemID);
+        Field field = item.Fields[item2.FieldID];
+        string value = Sitecore.Support.ExperienceEditor.Utils.WebUtility.HandleFieldValue(item2.Value, field.TypeKey);
+        FieldDescriptor key = new FieldDescriptor(obj.Uri, field.ID, value, false);
+        string obj2 = item2.ControlId ?? string.Empty;
+        string text2 = safeDictionary[key] = obj2;
         if (!string.IsNullOrEmpty(text2))
         {
           RuntimeValidationValues.Current[text2] = value;

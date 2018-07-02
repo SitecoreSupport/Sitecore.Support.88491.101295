@@ -2,14 +2,13 @@
 using Sitecore.Data.Fields;
 using Sitecore.Data.Items;
 using Sitecore.ExperienceEditor.Speak.Server.Contexts;
-using Sitecore.ExperienceEditor.Speak.Server.Requests;
 using Sitecore.ExperienceEditor.Speak.Server.Responses;
 using Sitecore.Globalization;
 using Sitecore.Pipelines.Save;
 
-namespace Sitecore.ExperienceEditor.Speak.Ribbon.Requests.SaveItem
+namespace Sitecore.Support.ExperienceEditor.Speak.Ribbon.Requests.SaveItem
 {
-  public class ValidateFields : PipelineProcessorRequest<PageContext>
+  public class ValidateFields : Sitecore.Support.ExperienceEditor.Speak.Server.Requests.PipelineProcessorRequest<PageContext>
   {
     public override PipelineProcessorResponseValue ProcessRequest()
     {
@@ -21,15 +20,13 @@ namespace Sitecore.ExperienceEditor.Speak.Ribbon.Requests.SaveItem
         SaveArgs.SaveField[] fields = saveItem.Fields;
         foreach (SaveArgs.SaveField saveField in fields)
         {
-          Field field = item.Fields[saveField.ID];
-          string fieldRegexValidationError = FieldUtil.GetFieldRegexValidationError(field, saveField.Value);
+          string fieldRegexValidationError = FieldUtil.GetFieldRegexValidationError(item.Fields[saveField.ID], saveField.Value);
           if (!string.IsNullOrEmpty(fieldRegexValidationError))
           {
             pipelineProcessorResponseValue.AbortMessage = Translate.Text(fieldRegexValidationError);
-            break;
+            return pipelineProcessorResponseValue;
           }
         }
-        return pipelineProcessorResponseValue;
       }
       return pipelineProcessorResponseValue;
     }
